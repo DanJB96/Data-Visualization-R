@@ -1,0 +1,198 @@
+---
+title: "Set de Ejercicios 2"
+author: "Daniel Juárez Bautista"
+date: "03/03/20"
+---
+
+# Información
+
+- Con quién colaboraste: 
+- Aproximadamente cuánto tiempo dispusiste para esta tarea: 2 horas
+- Si algo te dio más dificultad, ¿qué fue?: Generar mis propias preguntas. Por el tamaño de la base, sentí que todo se había abarcado y que el heatmap no explicaba mucho que no hicieran las otras gráficas. 
+
+
+# Parte 1: Señor de los Anillos, guiado (0.2 puntos por cada respuesta)
+
+```{r load-libraries-data, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readr)
+
+# Descarga los tres archivos CSV para esta tarea 
+fellowship <- read_csv("The_Fellowship_of_the_Ring.csv")
+tt <- read_csv("The_Two_Towers.csv")
+rotk <- read_csv("The_Return_of_the_King.csv")
+```
+
+*En el panel llamado `environment` en RStudio, haz click en las bases de datos,* sólo haciendo esto mira los datos y responde a las preguntas:
+
+**1: ¿En qué formato están estos datos? Wide o Long?** 
+Los datos están en formato long
+
+**2: ¿Cuál es el número total de palabras usadas por hobbits masculinos en las 3 películas?** 
+En fellowship of the ring, hablan 3644 palabras, en return of the king 2673 y en two towers 2463, por lo que el total es de 8780 palabras entre las tres películas. 
+
+**3: ¿Hay alguna `raza` dominante en alguna película? Esa raza dominante, ¿difiere entre películas?** 
+Durante fellowship of the ring y return of the king, predomina la participación de los Hobbits, sin embargo en two towers los humanos hablan más que el resto de razas. 
+
+**4: ¿Esta manera de mirar los datos es aplicable si te doy información sobre más películas o sobre todas las razas?** 
+Podría hacerse pero consumiría demasiado tiempo y no sería eficiente por la cantidad de observaciones y bases de datos que existirían. 
+
+
+```{r tidyify}
+# bind_rows() pone varias bases de datos una sobre otra 
+# gather() rearregla los datos en formato largo (tidy) 
+lotr <- bind_rows(fellowship, tt, rotk) %>%
+  gather(key = 'Gender', value = 'Words', Female, Male)
+```
+
+**5: ¿Cuál es la diferencia entre la nueva base de datos que creaste (lotr) y las 3 otras?**
+Que en la nueva base de datos se colapsa toda la info sin necesidad de cambiar entre bases para observarla, además de esta manera se puede realizar visualizaciones con todos estos datos. 
+
+**6: Es mucho más fácil trabajar con los datos en formato tidy, puedes usar film, género y raza para agregar los datos. Por ejemplo, ¿cuál es el número total de palabras usadas por hobbits masculinos? **
+
+```{r male-hobbits}
+lotr %>%
+  group_by(Gender, Race) %>%
+  summarize(total_words = sum(Words))
+```
+En este caso obtenemos el mismo resultado que en incisos anteriores pero de manera más automática gracias a tidy. 
+
+**7: ¿Cuál es la diferencia entre estos dos chunks? ¿Cómo se produce esa diferencia?** 
+
+```{r gender-race-pct1}
+lotr %>%
+  group_by(Gender, Race) %>%
+  summarize(total_words = sum(Words)) %>%
+  mutate(percent = total_words / sum(total_words))
+```
+
+
+```{r gender-race-pct2}
+lotr %>%
+  group_by(Gender, Race) %>%
+  summarize(total_words = sum(Words)) %>%
+  ungroup() %>%
+  mutate(percent = total_words / sum(total_words))
+```
+La diferencia se produce sobre el porcentaje, en el primer caso siguen agrupados por gender mientras que en la segunda no estan agrupados entonces el porcentaje es sobre toda la población. 
+
+**8: También es más fácil graficar datos agregados con datos tidy. ¿Para qué sirve la expresión `position="dodge"`? ¿Qué gráfico (con o sin "dodge") te resulta más fácil de interpretar y por qué?** 
+Dodge nos permite generar diferentes barras para cada característica (en este caso, la raza). En este caso, se me facilita más sin dodge porque así se aprecia más tanto los pequeños cambios porcentuales como la diferencia entre pequeños saltos en el caso de las mujeres. 
+
+```{r plot-gender-race}
+lotr_gender_race <- lotr %>%
+  group_by(Gender, Race) %>%
+  summarize(total_words = sum(Words)) %>%
+  ungroup() %>%
+  mutate(percent = total_words / sum(total_words))
+
+ggplot(lotr_gender_race, aes(x = Gender, y = total_words, fill = Race)) +
+  geom_col(position = "dodge") + scale_y_continuous(sec.axis = sec_axis(~ . / sum(lotr_gender_race$total_words), labels=scales::percent))
+
+# BONUS TIP
+# Es posible agregar un segundo eje-y en ggplot siempre y cuando sea una transformación directa 
+# del eje-y original. 
+# Agrega este código como una capa al gráfico de arriba y ve qué pasa
+# (las capas se agregan incorporando un signo de +): 
+# scale_y_continuous(sec.axis = sec_axis(~ . / sum(lotr_gender_race$total_words), labels=scales::percent))
+```
+
+# Parte 2: Señor de los Anillos, independiente (0.5 puntos por cada respuesta)
+
+Usando los datos tidy de *El Señor de los Anillos*, responde a estas preguntas y *haz un gráfico para cada una*:
+
+**1: ¿Hay alguna `raza` dominante en alguna película? Esa raza dominante, ¿difiere entre películas? **
+En este gráfico podemos ver que la participación de elfos es la más baja en todas las películas. Los hobbits dominan en fellowship y casi empatan con humanos en rotk; sin embargo, los humanos dominan en participación en tt. 
+
+```{r race-movies}
+lotr_movie_race <- lotr %>%
+  group_by(Film, Race) %>%
+  summarize(total_words = sum(Words)) %>%
+  ungroup() %>%
+  mutate(percent = total_words / sum(total_words))
+
+ggplot(lotr_movie_race, aes(x = Film, y = total_words, fill = Race)) +
+  geom_col(position = "dodge") + scale_y_continuous(sec.axis = sec_axis(~ . / sum(lotr_movie_race$total_words), labels=scales::percent))
+
+```
+
+**2: ¿Hay algún `género` dominante en alguna película?**
+En todas las películas es evidente que la participación masculina es mayor. 
+```{r gender-movies}
+lotr_movie_gender <- lotr %>%
+  group_by(Film, Gender) %>%
+  summarize(total_words = sum(Words)) %>%
+  ungroup() %>%
+  mutate(percent = total_words / sum(total_words))
+
+ggplot(lotr_movie_gender, aes(x = Film, y = total_words, fill = Gender)) +
+  geom_col() + scale_y_continuous(sec.axis = sec_axis(~ . / sum(lotr_movie_gender$total_words), labels=scales::percent))
+```
+
+**3: ¿Cuál es el número promedio de palabras usadas por los elfos femeninos? (en vez de crear una variable para calcular `sum()` en `summarize()`, usa `mean()`)**
+En promedio dicen 581 palabras por película. 
+```{r race-gender-mean}
+lotr %>%
+  group_by(Gender, Race) %>%
+  summarize(prom_words = mean(Words))
+```
+
+**4: Muestra un resumen del número de palabras usadas por cada raza y género en las 3 películas (vas a tener que agrupar usando las 3 variables (usando `group_by`), y probablemente necesites usar una como faceta en tu gráfico).**  
+
+```{r race-gender-films}
+lotr_movie_gender_race <- lotr %>%
+  group_by(Film, Gender, Race) %>%
+  summarize(total_words = sum(Words)) %>%
+  ungroup() %>%
+  mutate(percent = total_words / sum(total_words))
+
+ggplot(lotr_movie_gender_race, aes(x = Gender, y = total_words, fill = Film)) +
+  geom_col() + 
+  facet_wrap(~ Race) +
+  scale_y_continuous(sec.axis = sec_axis(~ . / sum(lotr_movie_gender_race$total_words), labels=scales::percent))
+```
+
+
+# Parte 3: El Señor de los Anillos, sin ayuda (0.7 puntos por cada respuesta)
+
+Piensa dos preguntas sobre la distribución de palabras usadas por raza, sexo y/o película para la trilogía de *El Señor de los Anillos*. 
+
+En vez de usar un gráfico de barras, usa un gráfico de lollipop para una y un heatmap para la otra. Mira el código de la clase para ver ejemplos (probablemente uses `geom_pointrange` y `geom_tile()`) 
+
+**1: Explica tu pregunta ...** 
+Qué película tiene mayor cantidad de palabras habladas?
+```{r my-own question-1}
+lotr_words_film <- lotr %>% 
+  group_by(Film) %>% 
+  summarize(avg_word = mean(Words))
+
+ggplot(lotr_words_film, aes(x = Film, y = avg_word)) +
+ geom_pointrange(aes(ymin = 0, ymax = avg_word), fatten = 3, size = 2) +
+   scale_y_continuous(labels = scales::comma) +
+  labs(x = "Película", y = "Promedio de Palabras") + 
+  theme_gray() +
+ coord_flip()
+```
+
+**2: Explica tu pregunta ...** 
+En qué película se habla más según la raza?
+```{r my-own question-2}
+lotr_words_film <- lotr  %>% 
+  group_by(Film, Race) %>% 
+  summarize(avg_words = mean(Words))
+
+heatmap <- ggplot(lotr_words_film, aes(x = Race, y = fct_rev(Film), 
+                             fill = avg_words)) +
+  geom_tile() + 
+  scale_fill_viridis_c(option = "inferno", name = "Palabras promedio") +
+  labs(x = "Raza", y = "Película",
+       title = "Conteo de palabras en El señor de los Anillos") +
+  coord_equal() +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.key.width = unit(3, "lines"),
+        legend.key.height = unit(0.5, "lines"))
+
+library(plotly)
+ggplotly(heatmap)
+```
