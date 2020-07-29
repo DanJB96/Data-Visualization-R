@@ -1,0 +1,69 @@
+---
+title: "Comparaciones"
+author: "Daniel Juárez"
+date: "7/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Para visualizar comparaciones, utilizaré los datos de mi presentación final y mostraré la variación en temperatura para todas las zonas de Australia entre 1980 y 2018. Para esto, no tomaré el promedio anual, debido a que los cambios climatológicos podrían ocultarse con mayores temperaturas en verano y menores en invierno. Me enfocaré en el salto de clima entre 1980 y 2019, ignorando tendencias intermedias.
+
+```{r Datos y Librerías}
+library(tidyverse)
+library(scales) 
+library(ggrepel)
+library(ggstance)
+library(geofacet)
+library(lubridate)
+
+temperature <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+```
+
+```{r Visualizaciones}
+temperature <- temperature %>% 
+  mutate(year = year(date),
+         month = month(date),
+         day = day(date)) %>% 
+  mutate(NAME = ifelse(city_name == "BRISBANE" , "Queensland",
+                ifelse(city_name == "CANBERRA", "Australian Capital Territory",
+                ifelse(city_name == "MELBOURNE", "Victoria",
+                ifelse(city_name == "PERTH", "Western Australia",
+                ifelse(city_name == "SYDNEY", "New South Wales",
+                ifelse(city_name == "PORT", "South Australia",
+                ifelse(city_name == "KENT", "South Australia",
+                       NA_real_))))))))
+
+temp_australia <- temperature %>% 
+  filter(year %in% c(1980, 2018), 
+         month == 12,
+         temp_type == "max") %>% 
+  group_by(NAME, month, year) %>%
+  filter(!any(is.na(temperature))) %>% 
+  mutate(temperature = mean(temperature),
+         temperature = format(round(temperature, 2),nsmall =2)) %>% 
+  filter(day == 1) %>% 
+  mutate(label_first = ifelse(year == 1980, paste0(NAME,"(",temperature,"°C)"), NA),
+         label_last = ifelse(year==2018, paste0("(",temperature,"°C)"), NA)) %>% 
+  filter(site_name != "KENT TOWN")
+
+ggplot(temp_australia, aes(x=year, y = temperature, group = NAME, color = NAME)) +
+  geom_line(size=1.5) +
+  guides(color = FALSE) +
+  geom_text_repel(aes(label = label_first), direction = "y", nudge_x = -1, seed = 1234) +
+  geom_text_repel(aes(label = label_last), direction = "y", nudge_x = 1, seed = 1234) +
+  labs(x = "Mes",
+              y = "(°C)",
+              color = "Territorio",
+              title = "Variación de temperatura máxima promedio en Australia por territorio", 
+       subtitle = "Diciembre 1980 a Diciembre 2019",
+        caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)") +
+  theme_void()
+```
+
+Podemos observar que para la mayoría de territorios existe evidencia a favor de un aumento de temperatura, posiblemente debido al cambio climático. En este gráfico podemos observar que de los territorios que sufrieron aumento de temperatura, Queensland fue el menos sensible pasando de ser el segundo territorio más caluroso en 1980 al tercero en 2018. 
+
+Nueva Gales del Sur y Victoria son casos interesantes pues experimentan una caída en su temperatura máxima promedio para el mes de Diciembre. Esto nos refleja una de las desventajas de este tipo de gráficos: no observamos tendencias históricas por lo que no sabemos si 1980 o 2018 fueron años atípicos para esos territorios. 
+

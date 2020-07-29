@@ -1,0 +1,49 @@
+---
+title: "Proporciones"
+author: "Daniel Juárez"
+date: "24/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Proporciones 
+
+En este caso, usaré una base de datos sobre lesiones cerebrales traumáticas. Esta información incluye divisiones por grupos de edad, tipo de heridas y tipo de respuestas. De esta información, deseo obtener qué tipo de heridas son más comunes en cada grupo de edad y en cada tipo de respuesta (muerte, hospitalización o tratamiento en sala de emergencia). 
+
+```{r Setup, include = FALSE}
+library(tidyverse)
+library(readr)
+
+tbi_age <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-24/tbi_age.csv')
+
+```
+
+```{r Visualización}
+# Comenzamos filtrando algunos grupos de edad y mantenemos las heridas más relevantes, en esta base muchas heridas se clasifican como otros y esas no nos interesan. 
+tbi_count <- tbi_age %>%
+  filter(age_group=="5-14" | age_group=="15-24" | age_group=="25-34" | age_group=="35-44") %>% 
+	mutate(injury_mechanism = ifelse(injury_mechanism %in% c('Assault', 'Intentional self-harm', 'Motor Vehicle Crashes', 'Unintentional Falls'), injury_mechanism, 'other')) %>%
+	group_by(age_group, type, injury_mechanism) %>%    # agrega la región para agrupar
+	summarise(total_cases = sum(number_est))
+
+# Conservamos una submuestra de la base original donde no consideremos los valores de heridas clasificados como otros y acomodamos los grupos de edad para visualizarlos en el orden correcto
+tbi <- subset(tbi_count, injury_mechanism!="other")
+tbi$age_group <- factor(tbi$age_group, levels = c("5-14", "15-24", "25-34", "35-44"))
+
+# COnstruimos la visualización y generamos tres gráficos separados para cada tipo de respuesta. 
+ggplot(tbi, aes(x= age_group, y=total_cases, fill=injury_mechanism )) +
+	geom_col(position='fill') +
+  facet_grid(. ~ type) +
+    labs(x = "Grupo de Edad", y = NULL,
+       title = "Incidencia de accidentes\n y tipo de respuesta",
+       subtitle = "Lesiones cerebrales traumáticas",
+       caption = "Fuente: tidytuesdayR package\n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "Tipo de herida") 
+
+```
+
+De estos resultados podemos concluir que las lesiones autoinfligidas de manera intencional son una causa relevante de muerte que va en aumento con la edad. Además, es curioso que las hospitalizaciones y visitas a la sala de emergencias derivadas por accidentes automovilísticos son consantes en todos los grupos de edad. Por último, las caídas no intencionales aumentan con la edad aumentan con la edad, lo que podría deberse a pérdida de motricidad o accidentes laborales. 
+

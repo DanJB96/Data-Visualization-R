@@ -1,0 +1,97 @@
+---
+title: "Tiempo"
+author: "Daniel Juárez"
+date: "5/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Para el tema de tiempo, utilizaré los datos de mi presentación final sobre los incendios en Australia. De manera específica, la evolución de la temperatura a través del tiempo. 
+
+```{r Datos y Librerías}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggridges)
+library(scales)
+library(scico)
+library(patchwork)
+
+temperature <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+
+```
+
+
+```{r}
+temperature <- temperature %>% 
+  mutate(year = year(date),
+         month = month(date),
+         day = day(date)) %>% 
+  mutate(NAME = ifelse(city_name == "BRISBANE" , "Queensland",
+                ifelse(city_name == "CANBERRA", "Australian Capital Territory",
+                ifelse(city_name == "MELBOURNE", "Victoria",
+                ifelse(city_name == "PERTH", "Western Australia",
+                ifelse(city_name == "SYDNEY", "New South Wales",
+                ifelse(city_name == "PORT", "South Australia",
+                ifelse(city_name == "KENT", "South Australia",
+                       NA_real_)))))))) %>% 
+  mutate(long = ifelse(city_name == "BRISBANE" , 153.13,
+                ifelse(city_name == "CANBERRA", 149.20,
+                ifelse(city_name == "MELBOURNE", 144.98,
+                ifelse(city_name == "PERTH", 115.98,
+                ifelse(city_name == "SYDNEY", 151.21,
+                ifelse(city_name == "PORT", 135.88,
+                ifelse(city_name == "KENT", 138.62,
+                       NA_real_)))))))) %>% 
+  mutate(lat = ifelse(city_name == "BRISBANE" , -27.39,
+                ifelse(city_name == "CANBERRA", -35.31,
+                ifelse(city_name == "MELBOURNE", -37.83,
+                ifelse(city_name == "PERTH", -31.93,
+                ifelse(city_name == "SYDNEY", -33.86,
+                ifelse(city_name == "PORT", -34.60,
+                ifelse(city_name == "KENT", -34.92,
+                       NA_real_))))))))
+
+months <- c("ENE","FEB","MAR",
+              "ABR","MAY","JUN",
+              "JUL","AGO","SEP",
+              "OCT","NOV","DIC")
+
+# Acomodamos los meses en orden para que la gráfica pueda decirnos algo sobre tendencias a lo largo del año.
+temperature$MonthAbb <- months[temperature$month]
+temperature$MonthAbb <- factor(temperature$MonthAbb, levels = months)
+
+# De la base de temperatura, nos quedamos con las variables de interés y las observaciones para 2018. 
+temperature = temperature[c("year", "month", "MonthAbb", "NAME", "temperature", "temp_type")]
+
+temperature <- temperature %>% 
+  filter(year == 2018) %>% 
+  filter(!is.na(temperature)) %>%
+  filter(temp_type == "max") %>% 
+  group_by(NAME, month, MonthAbb) %>%
+  summarize(temperature = mean(temperature))
+
+temperature<- na.omit(temperature)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+ggplot(temperature, aes(x=MonthAbb, y = temperature, color = NAME))+
+         geom_line(aes(group = NAME)) +
+  scale_color_manual(values=cbPalette) +
+         labs(x = "Mes",
+              y = "(°C)",
+              color = "Territorio",
+              title = "Temperatura máxima promedio en Australia por territorio", 
+       subtitle = "2018",
+        caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)") +
+  facet_wrap(.~NAME) +
+  theme_minimal() +
+  theme(axis.text.x=element_blank())
+```
+
+
+De este gráfico podemos distinguir qué regiones tienen mayor variabilidad de temperaturas durante el año. En este caso, vemos que Queensland tuvo menor variación durante el 2018, mientra que el territorio de la capital australiana tuvo mayor variación con caídas considerables en la temperatura durante invierno y aumentos en verano. 

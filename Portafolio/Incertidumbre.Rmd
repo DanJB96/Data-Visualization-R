@@ -1,0 +1,57 @@
+---
+title: "Incertidumbre"
+author: "Daniel Juárez"
+date: "25/3/2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Incertidumbre
+
+Para esta visualización utilizaré datos de la base de datos de mi proyecto final. Específicamente, los datos de temperatura para Australia (1910-2019) para observar la variación en temperatura histórica para cada mes. 
+
+```{r Setup, include=FALSE}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggridges)
+library(scales)
+
+temperature <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+
+```
+
+```{r Visualización}
+# Comenzamos con un poco de limpieza de datos para obtener todos los datos de la fecha y visualizar los meses. 
+temp <- temperature %>%
+  mutate(year = year(date), 
+                month = month(date), 
+                day = day(date)) 
+months <- c("Jan","Feb","Mar",
+              "Apr","May","Jun",
+              "Jul","Aug","Sep",
+              "Oct","Nov","Dec")
+
+# Acomodamos los meses en orden para que la gráfica pueda decirnos algo sobre tendencias a lo largo del año.
+temp$MonthAbb <- months[ temp$month ]
+temp$MonthAbb <- factor(temp$MonthAbb, levels = months)
+
+# El gráfico incluye el tipo de temperatura y la media de la distribución. 
+ggplot(temp, aes(x = temperature, y = fct_rev(MonthAbb), 
+                 fill = temp_type)) +
+  geom_density_ridges(scale = 5, quantile_lines = TRUE, quantiles = 2) +
+  labs(x = "Temperatura (°C)", y = "Mes",
+       title = "Temperatura mensual histórica en Australia",
+       subtitle = "1910-2019",
+       caption = "Fuente: tidytuesdayR package\n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "Tipo de temperatura") +
+  theme_minimal()
+```
+
+Con esta gráfica podemos observar que los meses que corresponden al invierno en el hemisferio sur hay menor temperatura en Australia, además podemos observar que hay más variación en las temperaturas mínimas que en las máximas durante el invierno por las colas con tendencia creciente que se observan entre mayo y septiembre. Esto podría ser resultado de la serie de tiempo tan larga que se está considerando (100 años). 

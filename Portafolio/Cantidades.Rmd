@@ -1,0 +1,62 @@
+---
+title: "Portafolio"
+author: "Daniel Juárez"
+date: "24/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Cantidades
+Para esta visualización, escogí datos sobre la asistencia a partidos de la NFL en Estados Unidos de 2000 a 2019 para observar si ha habido alguna tendencia que permita inferir algo sobre la popularidad del fútbol americano en los últimos 20 años. 
+
+Fuente: https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-02-04/attendance.csv
+
+```{r Setup, include=FALSE}
+library(tidyverse)
+library(readr)
+library(plotly)
+
+# Para esta visualización utilizaremos datos de asistencia a partidos de la NFL de 2000 a 2019.
+
+attendance <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-02-04/attendance.csv')
+
+```
+
+```{r Visualización}
+# Un problema con los datos es que tiene missing values que debemos convertir a 0 en algunos casos para poder obtener un promedio. 
+
+attendance_1 <- attendance %>%
+    mutate(weekly_attendance = if_else(is.na(weekly_attendance), 0, weekly_attendance))
+
+# Ignoramos las divisiones por equipo/estado para observar la tendencia nacional por semana del año. 
+attend <- attendance_1 %>% 
+  group_by(year, week) %>% 
+  summarize(week_attendance = mean(weekly_attendance)) 
+
+# Procedemos a crear el heatmap interactivo. 
+
+heatmap <- ggplot(attend, aes(x = week, y = year, 
+                             fill = week_attendance)) +
+  geom_tile() + 
+  scale_fill_viridis_c(option = "magma", name = "Asistencia semanal") +
+  labs(x = "Semana", y = NULL,
+       title = "Asistentes semanales promedio a partidos de la NFL",
+       subtitle = "2000-2019", 
+       caption = "Fuente: tidytuesdayR package") +
+  coord_equal() +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.key.width = unit(3, "lines"),
+        legend.key.height = unit(0.5, "lines"))
+
+ggplotly(heatmap)
+
+```
+
+Después de observar el heatmap, podemos observar que las semanas de baja asistencia han reducido de entre la 2 y la 10 a principios de siglo, a entre la 6 y la 10 aproximadamente después de 2007-2008. 
+
+Aunque es necesario analizar a profundidad este caso, podríamos sugerir la hipótesis de que el fútbol americano se popularizó después de 2007 por lo que las semanas "bajas" se recortaron. Esto podría obedecer a la popularización del superbowl por lo que los partidos previos a este evento tienen más asistentes.

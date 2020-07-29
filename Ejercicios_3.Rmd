@@ -1,0 +1,267 @@
+---
+title: "Set de Ejercicios 3"
+author: "Daniel Juarez Bautista"
+date: "1/04/20"
+---
+
+# Detalles
+
+- Con quién trabajaste: 
+- Aproximadamente cuánto tiempo te tomó esta tarea: 2 horas
+- Qué fue lo que más te costó trabajo: En la última pregunta con ggridges me mostraba un error al querer hacer el eje de las y con year, esto porque lo detectaba como numérico continuo. Lo convertí en factor y no hubo problema. 
+
+
+# Hans Rosling revisitado (aka Gapminder)
+
+```{r load-packages-data, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(scales)
+library(gapminder)
+
+# Carga los datos de Gapminder usando data()
+data(gapminder)
+
+# Crea una base de datos sólo con las filas de 1997
+gapminder_1997 <- gapminder %>%
+  filter(year == 1997)
+```
+
+
+## Análisis Univariado 
+
+Grafica un histograma de esperanza de vida en 1997 (`lifeExp`). Elige el número adecuado de bins. Aquí hay algo de código para ayudarte en el comienzo:
+
+```{r lifeexp-hist}
+ggplot(gapminder_1997, aes(x = lifeExp)) +
+  geom_histogram(bins = 20)
+```
+
+Haz un gráfico de densidad de la esperanza de vida en 1997 y agrégale color. ¿Qué te muestra el gráfico?
+Para esta gráfica, me interesa observar como se distribuyen los continentes en esperanza de vida. 
+
+```{r lifeexp-density}
+ggplot(gapminder_1997, aes(x = lifeExp, fill = continent)) +
+  geom_histogram(bins = 20)
+```
+
+Grafica un histograma de PBI per capita en 1997 (`gdpPercap`). Elige un número adecuado de bins. 
+
+```{r gdp-hist}
+ggplot(gapminder_1997, aes(x = gdpPercap)) +
+  geom_histogram(bins = 20)
+```
+
+Construye un gráfico de densidad de PBI per capita en 1997. ¿Qué te muestra el gráfico?
+
+Son los mismos datos de la gráfica anterior pero suavizados para observar una distribución. Esto nos muestra los datos de forma continua y no importa los bins. 
+
+```{r gdp-density}
+ggplot(gapminder_1997, aes(x = gdpPercap)) +
+  geom_density()
+```
+
+## Análisis Univariado por Grupos
+
+Construye múltiples gráficos de violín de PBI per capita por continente. Pinta los continentes de diferentes colores. Agrega puntos al 50% de transparencia. Aquí tienes algo de código para empezar:
+
+```{r gdp-continent}
+ggplot(gapminder_1997, aes(x = continent, y = gdpPercap, fill = continent)) +
+  geom_violin()+
+  geom_point(alpha = 0.5)
+```
+
+Construye múltiples gráficos de caja de PBI per capita en 1997 por continente. Pinta los continentes de diferentes colores. ¿Qué te dice este gráfico?
+En este gráfico observamos la distribución que tiene el PIB per cápita en cada continente. La barra que divide las cajas es la media, la caja va del segundo cuartil al tercer cuartil, la línea indica los cuartiles restantes y los puntos se consideran como outliers. 
+
+```{r gdp-continent-box}
+ggplot(gapminder_1997, aes(x = continent, y = gdpPercap, fill = continent)) +
+  geom_boxplot()
+```
+
+Construye múltiples gráficos de violín con la esperanza de vida en 1997 por continente, agrega color y también puntos semi transparentes. 
+
+```{r lifeexp-continent}
+ggplot(gapminder_1997, aes(x = continent, y = lifeExp, fill = continent)) +
+  geom_violin()+
+  geom_point(alpha = 0.5)
+```
+
+Construye gráficos de densidad superpuestos con esperanza de vida en 1997 en los distintos continentes. Como recordarás, Oceanía tienen muy pocas observaciones, omítelo (tienes una base filtrada que puedes usar si utilizas el código debajo). Colorea cada continente con un color diferente y agrega transparencia de 50%. 
+
+```{r continent-densities}
+library(ggridges)
+library(scales)
+
+gapminder_1997_sans_oceania <- gapminder_1997 %>%
+  filter(continent != "Oceania")
+
+# Completa el código para construir el gráfico 
+ggplot(gapminder_1997_sans_oceania, aes(x = lifeExp, y = continent, fill = continent)) +
+  geom_density_ridges(quantile_lines = TRUE, quantiles = 2, alpha = 0.5)
+```
+
+## Análisis Bivariado 
+
+Grafica salud (`lifeExp`) vs. riqueza (`gdpPercap`) en 1997. Colorea los puntos por continente. Aquí hay algo de código para ayudarte. 
+
+```{r health-wealth-basic}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp, colour = continent)) +
+  geom_point()
+```
+
+Construye el mismo gráfico, pero agrega `coord_trans(x = "log10")`. ¿Qué te dice el gráfico? ¿Qué es diferente respecto al gráfico anterior?
+
+Nos permite observar de mejor manera los datos agrupados de forma vertical porque altera el eje x. 
+
+```{r health-wealth-transformed}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp, colour = continent)) +
+  geom_point() + 
+  coord_trans(x = "log10")
+```
+
+
+Construye el mismo gráfico otra vez (sin el logaritmo y sin diferenciar por continente), y agrega `geom_smooth()`.
+
+```{r health-wealth-smooth}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() + 
+  geom_smooth()
+```
+
+Por defecto, R elige `method = "loess"` para construir la línea. ¿Qué es "loess"? (Páginas 240-41 en Cairo). Cambia el método a  `method = "lm"` (`lm` en este caso significa "linear model"). ¿Cuál es la diferencia?
+
+Lo que realiza loess es una regresión basándose en la vecindad y no en toda la distribución, como lo hace la lineal tradicional. En el caso de lm obtendremos una función lineal para la regresión. 
+
+La desventaja de lm es que con datos como los observados, ignora tendencias no lineales. 
+```{r health-wealth-lm}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+
+Grafica salud vs. riqueza *con* log en el eje de las x *y* con loess. 
+
+```{r health-wealth-log-loess}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() + 
+  coord_trans(x = "log10") +
+  geom_smooth()
+```
+
+Grafica salud vs. riqueza *con* log en el eje de las x *y* con `lm`. 
+
+```{r health-wealth-log-lm}
+ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() + 
+  coord_trans(x = "log10") +
+  geom_smooth(method = "lm")
+```
+
+
+## Parte Fancy
+
+Aquí hay un gráfico elegante del plot de salud y riqueza. Explca qué hace cada una de estas capas:
+
+- `ggplot(gapminder_1997, aes(...))`: indica la base de datos y las variables que utilizará para cada característica (eje x, eje y, colores, relleno, etc. )
+- `geom_point()`: con los datos mencionados anteriormente, realiza una gráfica de puntos
+- `guides()`: con esta editamos las leyendas sobre qué indica cada aesthetic en el gráfico, podemos indicar que un aesthetic no tenga leyenda. 
+- `labs()`: en este espacio se asignan todas las etiquetas a cambiar en el gráfico, título, subtítulos o cambios para que no aparezca el nombre de la variable, sino algún nombre que queramos. 
+- `scale_x_continuous()`: Esto nos sirve para alterar la escala del eje de las x para una variable continua. Desde cambiar el nombre que aparece en la gráfica, asignar límites (rango) para la variable, entre otros. 
+- `scale_size_continuous()`: con esto editamos las características en texto o puntos para variables continuas (geom_point), se puede alterar el rango y el tamaño de los puntos tanto en el gráfico como en la leyenda
+- `scale_color_viridis_d()`:
+- `coord_trans()`: Esto genera cambios en los ejes. Puede ser establecer límites, cambiar las dimensiones o en sus nombres. 
+- `theme_light()`: Es uno de los temas que tiene R para asignar a todo el gráfico. Es un conjunto de elecciones de color preestablecidas por R, también hay dark, minimal, etc. 
+- `theme()`: (Qué hace cada una de las opciones en `theme()`?) Esto se encarga de editar la parte visual de la gráfica. En lugar de escoger un tema de las opciones, podemos armar el nuestro seleccionando cada parte de la gráfica y editándola. 
+- `ggsave()`: Esto sirve para guardar nuestros gráficos como un archivo en nuestro directorio. Ya sea en pdf, png u otro formato. 
+
+```{r health-wealth-fancy}
+nice_health_wealth <- ggplot(gapminder_1997, aes(x = gdpPercap, y = lifeExp, 
+                                                 size = pop, color = continent)) +
+  geom_point() + 
+  guides(size = FALSE, color = guide_legend(title = NULL)) +
+  labs(x = "GDP per capita", y = "Life expectancy",
+       title = "Global health and wealth",
+       subtitle = "142 countries in 1997",
+       caption = "Source: The Gapminder Project") +
+  scale_x_continuous(labels = dollar) +
+  scale_size_continuous(range = c(1, 10)) +
+  scale_color_viridis_d(option = "inferno", begin = 0.2, end = 0.9) +
+  coord_trans(x = "log10") + 
+  theme_light() + 
+  theme(legend.position = "bottom",
+        panel.grid.minor.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(face = "bold", size = rel(1.5)),
+        plot.subtitle = element_text(color = "grey60"),
+        plot.caption = element_text(color = "grey60"))
+nice_health_wealth
+
+ggsave(nice_health_wealth, filename = "nice_health_wealth.pdf",
+       width = 7, height = 5, units = "in")
+ggsave(nice_health_wealth, filename = "nice_health_wealth.png",
+       width = 7, height = 5, units = "in")
+```
+
+
+## Multiple Años
+
+Observa la relación entre salud y riqueza en 1992, 1997, 2002, and 2007 en un único gráfico. Para hacer eso, no puedes usar la base `gapminder_1997` porque solo contiene 1997, necesitas crear una base nueva. 
+
+Colorea los puntos por continente y ajusta su tamaño por población. Utiliza facetas por año (tienes 4 años). Si lo necesitas, puedes mirar la documentación para `facet_wrap()`. Aquí hay algo de código para que puedas comenzar:
+
+```{r health-wealth-post-1992}
+gapminder_after_1992 <- gapminder %>%
+  filter(year >= 1992)
+
+ggplot(gapminder_after_1992, aes(x = gdpPercap, y = lifeExp, colour = continent, size = pop)) +
+  geom_point() + 
+  labs(size = "Population") + 
+  facet_wrap( ~ year)
+```
+
+Crea un gráfico similar para mostrar la relación entre salud y riqueza en 1952, 1957, 1962, y 1967. Vas a necesitar crear una base de datos nueva. 
+
+```{r health-wealth-early-cold-war}
+gapminder_1952_1967<- gapminder %>%
+  filter(year >= 1952 & year <= 1967)
+
+ggplot(gapminder_1952_1967, aes(x = gdpPercap, y = lifeExp, colour = continent, size = pop)) +
+  geom_point() + 
+  labs(size = "Population") + 
+  facet_wrap( ~ year)
+```
+
+## Ridge plots
+
+Usando tus habilidades para construir visualizaciones y haciendo referencia a [`ggridges`](https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html)), crea un ridge plot mostrando la distribución de esperanza de vida o PBI per capita en el tiempo (o entre continentes). Guarda este gráfico como PDF y como PNG usando `ggsave()`
+
+
+```{r gapminder-ridgeplot}
+gapminder_1952_after_1992 <- rbind(gapminder_after_1992, gapminder_1952_1967)
+
+lifeExp_ggridge <- ggplot(gapminder_1952_after_1992, aes(x = lifeExp, y = as.factor(year), fill = as.factor(year))) +
+  geom_density_ridges(quantile_lines = TRUE, quantiles = 2, alpha = 0.5) + 
+  labs(y = NULL, fill = "year")
+lifeExp_ggridge
+ggsave(lifeExp_ggridge, filename = "lifeExp_ggridge.pdf",
+       width = 7, height = 5, units = "in")
+```
+
+
+## Bonus: interactividad
+
+Intenta construir un gráfico interactivo en HTML. La forma más fácil de hacer esto es usando el paquete `plotly` (lo puedes instalar usando el panel "Packages" en RStudio), y luego usar la función `ggplotly()`. 
+
+Debajo hay pedacitos de código que te pueden ayudar (recuerda quitarles el # para poder usarlos.  
+
+Revisa la [documentacion](https://plot.ly/ggplot2/), especialmente [esta página](https://plot.ly/ggplot2/interactive-tooltip/) sobre cómo ajustar las herramientas que aparecen cuando te acercas a puntos o áreas.
+
+
+```{r interactive, message=FALSE}
+library(plotly)
+my_cool_plot <- ggplot(gapminder_1997_sans_oceania, aes(x = gdpPercap, y = lifeExp, colour = continent, text = paste("country:", country))) +
+     geom_point()  
+my_cool_plot
+ggplotly(my_cool_plot)
+```

@@ -1,0 +1,102 @@
+---
+title: "Set de Ejercicios 4"
+author: "Daniel Juárez Bautista"
+date: "22 de abril de 2020"
+---
+
+# Detalles
+
+- Con quién trabajaste: 
+- Aproximadamente cuánto tiempo trabajaste en este set de ejercicios: Tres horas
+- Qué te dio más trabajo: El gráfico de pendiente porque los datos eran demasiados y el proceso de reducir las observaciones requirió valorar qué quería mostrar pues si incluía todos los datos, el gráfico se saturaba y no se podía interpretar nada. 
+
+Para esta tarea tienes pocas instrucciones. Utilizarás datos de uso de agua en ciertos períodos de tiempo y de desempleo en estados de los Estados Unidos para varios años. Carga las bases de datos y realiza los gráficos a continuación. Pista: Es posible que tengas que agrupar datos.
+
+
+# Organiza los datos
+
+```{r load-packages-data, warning=FALSE, message=FALSE}
+library(tidyverse)
+
+water_usage <- read_csv("water_usage.csv")
+unemployment <- read_csv("unemployment.csv")
+```
+
+# Parte 1: Gráficos Bala 
+
+Aquí observo el cambio en consumo de agua. En el gráfico, también se puede observar si estos consumos corresponden a niveles conservadores, altos o muy altos de consumo de agua.  
+
+```{r}
+water_usage$period <- factor(water_usage$period, levels = c("JAN/FEB", "MAR/APR", "MAY/JUN", "JUL/AUG", "SEPT/OCT", "NOV/DEC"))
+
+ggplot(water_usage, aes(x = period)) +
+   scale_y_continuous(labels = scales::comma) +
+   geom_errorbar(aes(ymin = current, ymax = current), color = "blue", width = 0.75) +
+  geom_point(aes(y = current), size = 3, color = "blue") +
+  geom_col(aes(y = conservative), fill = "black", alpha = 0.2) +
+  geom_col(aes(y = high), fill = "black", alpha = 0.2) +
+  geom_col(aes(y = extremely_high), fill = "black", alpha = 0.2) +
+  geom_col(aes(y = previous), fill = "black", width = 0.4, alpha = 0.9) +
+  labs(x = NULL, y = NULL, 
+       title = "Consumo bimestral de agua",
+       subtitle = " Consumo actual en azul \n Consumo anterior en negro") +
+  geom_text(aes( y = conservative), label = "Conservative",position = position_stack(vjust=.5), colour="brown4") +
+  geom_text(aes( y = high), label = "High",position = position_stack(vjust=.8), colour="brown3") +
+  geom_text(aes( y = extremely_high), label = "Extremely \n High",position = position_stack(vjust=.9), colour="brown1") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank())
+```
+
+
+# Parte 2: Múltiples pequeños 
+Para este gráfico, analizo la distribución de desempleo en los estados por región en tres momentos distintos. En estos datos observamos que el periodo que incluye al 2008 muestra una alza generalizada en desempleo. Sin embargo, lo interesante es observar si la recuperación tras esta crisis repercutió en las diferencias entre regiones o en los niveles de desigualdad entre estados en términos de desempleo. 
+
+```{r}
+library(ggridges)
+library(scales)
+unemployment$yearcat[unemployment$year < 2010] <- "2006-2009"
+unemployment$yearcat[unemployment$year<2014 & unemployment$year>2009] <- "2010-2013"
+unemployment$yearcat[unemployment$year > 2013] <- "2014-2016"
+
+ggplot(unemployment, aes(x = unemployment, y = as.factor(yearcat), fill = region)) +
+         geom_density_ridges(quantile_lines = TRUE, quantiles = 2, alpha = 0.5) + 
+  labs(x = "Nivel de desempleo", y=NULL, title = "Distribución de niveles de desempleo en Estados Unidos por región", subtitle = "2006-2016")+
+  facet_grid(region ~ .) + 
+  guides(fill = FALSE)
+```
+
+
+# Parte 3: Gráficos de Pendiente
+
+Para esta gráfica, considero que los datos nos permiten observar cómo se recuperaron (si lo hicieron) algunos estados después de la crisis de 2008. Podemos observar que aumenta el nivel de desempleo para todos los estados pero la respuesta de recuperación es distinta para algunos. Me enfoco en la división pacífico por simplicidad y para no saturar la gráfica de datos. 
+
+```{r}
+library(ggrepel)
+unemployment_first_last_pacific <- unemployment %>% 
+  filter(month==1) %>% 
+  filter(division == "Pacific") %>% 
+  mutate(label_first = ifelse(year == 2006, paste0(state, " (", unemployment, ")" ), NA),
+         label_last = ifelse(year == 2016, unemployment, NA))
+
+ggplot(unemployment_first_last_pacific, aes(x = year, y = unemployment, group = state, color = state)) +
+  geom_line(size = 1.5) +
+  geom_text_repel(aes(label = label_first), direction = "y", nudge_x = -1, seed = 1234) +
+  geom_text_repel(aes(label = label_last), direction = "y", nudge_x = 1, seed = 1234) +
+  guides(color = FALSE) +
+  labs(title = "Cambio en nivel de desempleo en Estados Unidos", subtitle = "Región pacífico (2006-2016)") +
+  theme_void()
+  
+unempl_f_l_pacific <-  unemployment_first_last_pacific %>% 
+  filter(year==2006 | year==2016)
+
+  ggplot(unempl_f_l_pacific, aes(x = year, y = unemployment, group = state, color = state)) +
+  geom_line(size = 1.5) +
+  geom_text_repel(aes(label = label_first), direction = "y", nudge_x = -1, seed = 1234) +
+  geom_text_repel(aes(label = label_last), direction = "y", nudge_x = 1, seed = 1234) +
+  guides(color = FALSE) +
+  labs(title = "Cambio en nivel de desempleo en Estados Unidos", subtitle = "Región pacífico (2006-2016)") +
+  theme_void()
+```
+
+

@@ -1,0 +1,351 @@
+---
+title: "Presentación Final VizPol"
+author: "Daniel Juárez"
+date: "7/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Obteniendo los datos}
+temperature <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+
+rainfall <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/rainfall.csv')
+
+nasa_fire <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/MODIS_C6_Australia_and_New_Zealand_7d.csv')
+
+# For JSON File of fires
+url <- "http://www.rfs.nsw.gov.au/feeds/majorIncidents.json"
+
+aus_fires <- sf::st_read(url)
+```
+
+```{r Cargando librerías}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggridges)
+library(scales)
+library(gganimate)
+library(gifski)
+library(sf)
+library(scico)
+library(patchwork)
+```
+
+```{r Evolución de la temperatura}
+temperature <- temperature %>%
+  mutate(year = year(date), 
+                month = month(date), 
+                day = day(date)) 
+
+months <- c("ENE","FEB","MAR",
+              "ABR","MAY","JUN",
+              "JUL","AGO","SEP",
+              "OCT","NOV","DIC")
+
+# Acomodamos los meses en orden para que la gráfica pueda decirnos algo sobre tendencias a lo largo del año.
+temperature$MonthAbb <- months[ temperature$month ]
+temperature$MonthAbb <- factor(temperature$MonthAbb, levels = months)
+
+# El gráfico incluye el tipo de temperatura y la media de la distribución. Esto nos permite observar si la tendencia de clima ha cambiado. 
+hist_temp <- temperature %>% 
+  filter(year>=1980) %>% 
+  ggplot(aes(x = temperature, 
+             y = fct_rev(MonthAbb), 
+             fill = temp_type)) +
+  geom_density_ridges(scale = 5, 
+                      quantile_lines = TRUE, quantiles = 2) +
+  labs(x = "Temperatura (°C)",
+       y = NULL,
+       title = "Temperatura mensual en Australia",
+       subtitle = "({as.integer(frame_time)})",
+       caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "Tipo de temperatura") +
+  theme_minimal() +
+  transition_time(year) +
+  ease_aes("linear")
+animate(hist_temp,nframes=150, duration=20)
+anim_save("GIF_temp_hist.gif", hist_temp)
+```
+
+```{r Evolución de la precipitación}
+rainfall <- rainfall %>% 
+  mutate(month = as.integer(month), day = as.integer(day))
+
+rainfall$MonthAbb <- months[ rainfall$month ]
+rainfall$MonthAbb <- factor(rainfall$MonthAbb, levels = months)
+
+time_rain <- rainfall %>% 
+  filter(year>=1980) %>% 
+  ggplot(aes(MonthAbb, rainfall)) +
+  geom_bar(stat = 'identity', fill = "blue") +
+  theme_bw() +
+  ylab("Precipitación (mm)") +
+  xlab(NULL) +
+  labs(title = "Lluvia mensual en Australia",
+       subtitle = "({as.integer(frame_time)})",
+       caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)") +
+  scale_y_reverse() + 
+  transition_time(year) +
+  ease_aes("linear")
+anim_save("GIF_rain_hist_bar.gif", time_rain)
+
+hist_rain <- rainfall %>% 
+  filter(year>=1980) %>% 
+  ggplot(aes(y = MonthAbb, 
+             x = rainfall), 
+         fill = "blue") +
+  geom_density_ridges(scale = 5, 
+                      quantile_lines = TRUE, 
+                      quantiles = 2) +
+  labs(x = "Precipitación (mm)",
+       y = NULL,
+       title = "Lluvia mensual en Australia",
+       subtitle = "({as.integer(frame_time)})",
+       caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)") +
+  theme_minimal() +
+  transition_time(year) +
+  ease_aes("linear")
+anim_save("GIF_rain_hist.gif", hist_rain)
+```
+
+```{r Lluvia 2019}
+# Cargamos el shapefile de Australia para crear nuestro mapa
+australia <- st_read("Australian States Shapefile/States Map.shp",
+                                  stringsAsFactors = FALSE)
+#Cargamos los datos de lluvia que incluyen la ubicación de las estaciones de medición. 
+rainfall <- rainfall %>% 
+  mutate(NAME = ifelse(city_name == "Adelaide", "South Australia", 
+                ifelse(city_name == "Brisbane" , "Queensland",
+                ifelse(city_name == "Canberra", "Australian Capital Territory",
+                ifelse(city_name == "Melbourne", "Victoria",
+                ifelse(city_name == "Perth", "Western Australia",
+                ifelse(city_name == "Sydney", "New South Wales",
+                       NA_real_)))))))
+
+# Para visualizar el nombre de las regiones del país, establecemos los centroides. 
+australia_centroid <- australia %>% 
+  st_centroid() %>% 
+  mutate(long = st_coordinates(.)[,1],
+         lat = st_coordinates(.)[,2]) %>% 
+  filter(NAME != "Tasmania" & NAME != "Other Territories" & NAME != "Northern Territory" & NAME !="Australian Capital Territory")
+
+# Con esto, tomamos las variables de longitud y latitud para convertirlas a un formato que pueda leerse por geom_sf
+estaciones_rainfall <- rainfall %>% 
+  st_as_sf(coords = c("long","lat")) %>% 
+  mutate(month = as.integer(month),
+         day = as.integer(day)) %>% 
+  filter(year == 2019) %>% 
+  filter(!is.na(rainfall))
+estaciones_rainfall <- estaciones_rainfall[c("year", "month", "NAME", "geometry")]
+estaciones_rainfall <- unique(estaciones_rainfall)
+st_crs(estaciones_rainfall) <- st_crs(australia)
+
+# De la base de lluvia, nos quedamos con las variables de interés y las observaciones para 2019 (previo inmediato a los incendios). 
+rainfall_keep = rainfall[c("year", "month", "day", "NAME", "rainfall")]
+rainfall_keep <- rainfall_keep %>% 
+  mutate(month = as.integer(month)) %>% 
+  filter(year == 2019) %>% 
+  filter(!is.na(rainfall)) %>% 
+  group_by(NAME, month) %>%
+  summarize(rainfall = mean(rainfall))
+
+lluvia_2019 <- australia %>% 
+  left_join(rainfall_keep)
+
+# Como no tenemos información sobre todas las regiones, definimos que omita la búsqueda en estas regiones y construimos nuestra animación que cambie por mes. 
+lluvia_2019 <- na.omit(lluvia_2019)
+lluvia_2019_gif <- ggplot() +
+  geom_sf(data = australia) +
+  geom_sf(data = lluvia_2019, 
+          aes(fill = rainfall), 
+          size = 0.25) +
+  geom_sf(data = estaciones_rainfall, size = 2) +
+  geom_label(data = australia_centroid, 
+             aes(x = long, y = lat, label = NAME), 
+             size = 2, alpha = 0.25) +
+  coord_sf() + 
+  scale_colour_brewer() +
+  labs(title = "Precipitación promedio en Australia por territorio", 
+       subtitle = "2019/{as.integer(frame_time)}",
+        caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "(mm)") +
+  transition_time(month) + 
+  ease_aes("linear") +
+  theme_void()
+
+anim_save("GIF_rain_2019.gif", lluvia_2019_gif)
+```
+
+```{r Temperatura 2019}
+# Cargamos el shapefile de Australia para crear nuestro mapa
+australia <- st_read("Australian States Shapefile/States Map.shp",
+                                  stringsAsFactors = FALSE)
+
+temperature <- temperature %>% 
+  mutate(NAME = ifelse(city_name == "BRISBANE" , "Queensland",
+                ifelse(city_name == "CANBERRA", "Australian Capital Territory",
+                ifelse(city_name == "MELBOURNE", "Victoria",
+                ifelse(city_name == "PERTH", "Western Australia",
+                ifelse(city_name == "SYDNEY", "New South Wales",
+                ifelse(city_name == "PORT", "South Australia",
+                ifelse(city_name == "KENT", "South Australia",
+                       NA_real_)))))))) %>% 
+  mutate(long = ifelse(city_name == "BRISBANE" , 153.13,
+                ifelse(city_name == "CANBERRA", 149.20,
+                ifelse(city_name == "MELBOURNE", 144.98,
+                ifelse(city_name == "PERTH", 115.98,
+                ifelse(city_name == "SYDNEY", 151.21,
+                ifelse(city_name == "PORT", 135.88,
+                ifelse(city_name == "KENT", 138.62,
+                       NA_real_)))))))) %>% 
+  mutate(lat = ifelse(city_name == "BRISBANE" , -27.39,
+                ifelse(city_name == "CANBERRA", -35.31,
+                ifelse(city_name == "MELBOURNE", -37.83,
+                ifelse(city_name == "PERTH", -31.93,
+                ifelse(city_name == "SYDNEY", -33.86,
+                ifelse(city_name == "PORT", -34.60,
+                ifelse(city_name == "KENT", -34.92,
+                       NA_real_))))))))
+
+# Para visualizar el nombre de las regiones del país, establecemos los centroides.
+australia_centroid <- australia %>% 
+  st_centroid() %>% 
+  mutate(long = st_coordinates(.)[,1],
+         lat = st_coordinates(.)[,2]) %>% 
+  filter(NAME != "Tasmania" & NAME != "Other Territories" & NAME != "Northern Territory" & NAME !="Australian Capital Territory")
+
+# Con esto, tomamos las variables de longitud y latitud para convertirlas a un formato que pueda leerse por geom_sf
+estaciones_temperature <- temperature %>% 
+  st_as_sf(coords = c("long","lat")) %>% 
+  filter(year == 2019) %>% 
+  filter(!is.na(temperature))
+estaciones_temperature <- estaciones_temperature[c("year", "month", "NAME", "geometry")]
+estaciones_temperature <- unique(estaciones_temperature)
+st_crs(estaciones_temperature) <- st_crs(australia)
+
+# De la base de temperatura, nos quedamos con las variables de interés y las observaciones para 2019 (previo inmediato a los incendios). 
+temperature_keep = temperature[c("year", "month", "day", "NAME", "temperature", "temp_type")]
+temperature_merge <- readr::read_csv('merge_temp_keep.csv')
+temperature_keep <- rbind(temperature_keep, temperature_merge)
+
+# MAX
+temperature_keep_max <- temperature_keep %>% 
+  filter(year == 2019) %>% 
+  filter(!is.na(temperature)) %>%
+  filter(temp_type == "max") %>% 
+  group_by(NAME, month) %>%
+  summarize(temperature = mean(temperature))
+
+temperaturamax_2019 <- australia %>% 
+  left_join(temperature_keep_max)
+
+# Como no tenemos información sobre todas las regiones, definimos que omita la búsqueda en estas regiones y construimos nuestra animación que cambie por mes. 
+temperaturamax_2019 <- na.omit(temperaturamax_2019)
+gif_temp_max <- ggplot() +
+  geom_sf(data = australia) +
+  geom_sf(data = temperaturamax_2019, 
+          aes(fill = temperature), 
+          size = 0.25) +
+  geom_sf(data = estaciones_temperature, size = 2) +
+  geom_label(data = australia_centroid, 
+             aes(x = long, y = lat, label = NAME), 
+             size = 2, alpha = 0.25) +
+  coord_sf() + 
+  scale_fill_scico(palette = "lajolla") +
+  labs(title = "Temperatura máxima promedio en Australia por territorio", 
+       subtitle = "2019/{as.integer(frame_time)}",
+        caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "(°C)") +
+  transition_time(month) + 
+  ease_aes("linear") +
+  theme_void()
+anim_save("GIF_tempmax_2019.gif", gif_temp_max)
+
+# MIN
+temperature_keep_min <- temperature_keep %>% 
+  filter(year == 2019) %>% 
+  filter(!is.na(temperature)) %>%
+  filter(temp_type == "min") %>% 
+  group_by(NAME, month) %>%
+  summarize(temperature = mean(temperature))
+
+temperaturamin_2019 <- australia %>% 
+  left_join(temperature_keep_min)
+
+# Como no tenemos información sobre todas las regiones, definimos que omita la búsqueda en estas regiones y construimos nuestra animación que cambie por mes. 
+temperaturamin_2019 <- na.omit(temperaturamin_2019)
+gif_temp_min <- ggplot() +
+  geom_sf(data = australia) +
+  geom_sf(data = temperaturamin_2019, 
+          aes(fill = temperature), 
+          size = 0.25) +
+  geom_sf(data = estaciones_temperature, size = 2) +
+  geom_label(data = australia_centroid, 
+             aes(x = long, y = lat, label = NAME), 
+             size = 2, alpha = 0.25) +
+  coord_sf() + 
+  scale_fill_scico(palette = "lajolla") +
+  labs(title = "Temperatura mínima promedio en Australia por territorio", 
+       subtitle = "2019/{as.integer(frame_time)}",
+        caption = "Fuente: Australian Government, Bureau of Metereology \n Elaborado por Daniel Juárez (@dan_jb_)",
+       fill = "(°C)") +
+  transition_time(month) + 
+  ease_aes("linear") +
+  theme_void()
+anim_save("GIF_tempmin_2019.gif", gif_temp_min)
+```
+
+```{r Incendios 2019}
+# Cargamos el shapefile de Australia para crear nuestro mapa
+australia <- st_read("Australian States Shapefile/States Map.shp",
+                                  stringsAsFactors = FALSE)
+
+incendios <- nasa_fire %>% 
+  st_as_sf(coords = c("longitude","latitude")) %>% 
+  mutate(month = month(acq_date),
+         day = day(acq_date),
+         year = year(acq_date),
+         acq_time = as.integer(acq_time)) %>% 
+  filter(satellite == "T",
+         !is.na(brightness),
+         confidence>=90) %>% 
+  mutate(date = floor_date(acq_date, "month"))
+
+incendios <- incendios[c("brightness", "acq_date", "geometry", "year", "month", "date")]
+
+incendios<- unique(incendios)
+st_crs(incendios) <- st_crs(australia)
+
+gif_fires <- ggplot() +
+  geom_sf(data = australia) +
+  geom_sf(data = incendios, 
+          aes(color = brightness)) +
+  coord_sf() + 
+  scale_color_scico(palette = "lajolla") +
+  labs(title = "Evolución de la temporada de incendios", 
+       subtitle = "(2019-2020)",
+       caption = "Fuente: NASA Active Fires Dataset \n Elaborado por Daniel Juárez (@dan_jb_)",
+       color = "Intensidad (°K)") +
+  transition_time(date) + 
+  ease_aes("linear") +
+  theme_void()
+anim_save("GIF_fires.gif", gif_fires)
+
+st_crs(aus_fires) <- st_crs(australia)
+
+zonas_riesgo <- ggplot() +
+  geom_sf(data = australia) +
+  geom_sf(data = aus_fires, color = "red") +
+  coord_sf() + 
+  labs(title = "Zonas de Riesgo", 
+       subtitle = "(2019-2020)",
+       caption = "Fuente: New South Wales Rural Fire Service \n Elaborado por Daniel Juárez (@dan_jb_)") +
+  theme_void()
+zonas_riesgo
+```
+

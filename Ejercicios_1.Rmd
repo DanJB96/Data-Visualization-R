@@ -1,0 +1,274 @@
+---
+title: "Set de Ejercicios 1"
+author: "Daniel Juarez Bautista"
+date: "15/02/20"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Detalles
+
+- Con quién colaboraste: NOMBRES 
+- Aproximadamente cuánto tiempo tomaste para hacer esta tarea: 3 horas
+- Qué te dio más dificultad: Establecer la diferencia en el ggplot para cada aesthetic 
+
+
+# Parte 1: RMarkdown
+
+Para familiarizarte con RStudio, por favor realiza este [breve tutorial](https://stat545.com/r-basics.html). Partes 2.1 a 2.4. 
+
+Para familiarizarte con RMarkdown, por favor realiza este [breve tutorial](https://rmarkdown.rstudio.com/lesson-1.html).En particular, ve las secciones Introduction, How it Works, Code Chunks, Inline Code, Markdown Basics y Output formats. 
+
+
+# Parte 2: Gapminder
+
+En esta parte utilizaremos datos del [Proyecto Gapminder](https://www.gapminder.org/). Puede que ya hayas visto la [Ted Talk](https://www.ted.com/talks/hans_rosling_the_best_stats_you_ve_ever_seen) de Hans Rosling que muestra cómo la salud y la riqueza a nivel global han aumentado. Si no viste el video, te recomiendo que lo hagas! Desafortunadamente, Hans murió en 2017.
+
+En primer lugar, tienes que instalar el paquete `gapminder`, puedes hacerlo en la consola, escribiendo **install.packages("gapminder")** o usando el panel "packages" en RStudio. 
+
+## Esperanza de vida en 2007
+
+```{r load-packages, warning=FALSE, message=FALSE}
+# Nota el uso de warning=FALSE y message=FALSE en las opciones del chunk. 
+# R produce un montón de mensajes cuando carga el tidyverse   
+# y de esta forma los evitamos en el documento final 
+
+library(tidyverse)  # Con esto obtienes ggplot2, dplyr, y otros paquetes que vas a necesitar
+library(gapminder)  # Con esto obtienes los datos de Gapminder 
+```
+
+Veamos las primeras filas de datos:
+
+```{r view-data}
+head(gapminder)
+```
+
+La base de datos `gapminder` contiene filas para todos los años y países. Nosotros sólo queremos ver 2007, para ello creamos una base de datos nueva que filtra sólo las filas para 2007. 
+
+El caracter `%>%` se denomina *pipe* y nos permite concatenar funciones. También pudimos haber escrito `gapminder_2007 <- filter(gapminder, year == 2007)`.
+
+```{r filter-2007}
+gapminder_2007 <- gapminder %>%
+  filter(year == 2007)
+
+head(gapminder_2007)
+```
+
+
+## Esperanza de vida promedio en 2007 por continente
+
+Nos interesa conocer las diferencias en esperanza de vida entre distintos continentes Primero agrupamos las filas por continente y calculamos el promedio. 
+
+La función `%>%` es muy útil aquí. Como nos deja unir funciones, podemos leer los comandos como un grupo de instrucciones: usa los datos de `gapminder`, filtralos, agrupalos por continent, y calcula la media para cada grupo. Sin usar `%>%`, podríamos escribir la misma cadena así:  `summarize(group_by(filter(gapminder, year == 2007), continent), avg_life_exp = mean(lifeExp))`. Pero es bastante feo, muy difícil de leer y tiene un montón de paréntesis, lo que puede producir errores.
+
+
+```{r calc-mean}
+gapminder_cont_2007 <- gapminder %>%
+  filter(year == 2007) %>% 
+  group_by(continent) %>%
+  summarize(avg_life_exp = mean(lifeExp))
+
+head(gapminder_cont_2007)
+```
+
+Grafiquemos estos promedios como un gráfico de barras. 
+
+```{r plot-2007-bar}
+ggplot(data = gapminder_cont_2007, 
+       mapping = aes(x = continent, y = avg_life_exp, fill = continent)) + 
+  geom_col()
+```
+
+¿Qué piensas de estos colores? En clase vimos varias alternativas para cambiar el color. Probemos una, recuerda que `continente` es una variable categórica, debes usar `scale_fill_` . Cuando coloreamos variables categóricas es mejor usar colores distintos para identificar las diversas categorías, si la variable es ordinal, podemos usar una escala de gradientes del mismo color. En este caso usamos una paleta de colores amigable para quienes son daltónicos, hay dos ejemplos, puedes elegir el que te guste más, o utlizar otro color.  
+
+
+```{r plot-2007-bar-color}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", 
+               "#CC79A7")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", 
+                "#CC79A7")
+
+ggplot(data = gapminder_cont_2007, 
+       mapping = aes(x = continent, y = avg_life_exp, fill = continent)) + 
+  geom_col() + scale_fill_manual(values=cbbPalette)
+```
+
+
+Ahora hagamos la gráfica como distribuciones de densidades. Para eso usamos los datos originales filtrados `gapminder_2007`:
+
+```{r plot-2007-density}
+ggplot(data = gapminder_2007, 
+       mapping = aes(x = lifeExp, fill = continent)) + 
+  geom_density()
+```
+
+Ahora construyamos los gráficos en forma de violín. Estas son las distribuciones de densidad vistas de costado:
+
+```{r plot-2007-violin}
+ggplot(data = gapminder_2007, 
+       mapping = aes(x = continent, y = lifeExp, fill = continent)) + 
+  geom_violin()
+```
+
+También podemos agregar puntos para cada país al gráfico de violín. 
+
+```{r plot-2007-violin-points}
+ggplot(data = gapminder_2007, 
+       mapping = aes(x = continent, y = lifeExp, fill = continent)) + 
+  geom_violin() +
+  geom_point()
+```
+
+Cada uno de los gráficos (de barras, de densidad y violín) muestra diferentes formas de ver un mismo número, la expectativa de vida promedio en cada continente. **Responde las siguientes preguntas:**
+
+- ¿Qué gráfico es más útil? Depende de lo que queramos visualizar. La ventaja de las barras es que son directas, comúnes y fáciles de entender. Sin embargo, perdemos datos que el promedio no nos dice, como la distribución. En el caso de la de violín, nos puede servir para no tener datos encimados que nos dificulte entender las gráficas. 
+- ¿Cuáles muestran variabilidad? Densidad y violín.
+- ¿Qué le pasa a Oceanía? En este caso, Oceanía no está conformado por muchos países por lo que el promedio sí lo podemos ver pero al ver una distribución, no es posible observar alguna tendencia por las pocas muestras.  
+
+# Parte 3: R y ggplot
+
+Lee el Capítulo 3 de [R for Data Science](https://r4ds.had.co.nz/data-visualisation.html#exercises-3) y realiza los siguientes ejercicios:
+
+## 3.2.4
+Preguntas 1 a 5. 
+
+**1: Si corres `ggplot(data = mpg)`, ¿qué ves? ¿Por qué?**
+
+```{r blank, fig.width=2, fig.height=2}
+ggplot(data = mpg)
+```
+
+Un gráfico en blanco porque solo estamos indicando al comando ggplot que utilice la base de datos mpg. No estamos indicando variables ni aesthetics.   
+
+(En las opciones del chunk está especificado `fig.width` y `fig.height`. Puedes hacer click en la ruedita a la derecha del chunk para ver otras opciones.)
+
+**2: ¿Cuántas filas y cuántas columnas hay en `mpg`?**
+
+```{r mpg-details}
+# Puedes averiguar de tres formas distintas:
+#1
+nrow(mpg)
+ncol(mpg)
+
+#2 
+dim(mpg)
+
+#3 
+mpg
+```
+
+**3: ¿Qué describe la variable `drv`? Escribe `?mpg` en la consola para averiguarlo.**
+
+Si la dirección del vehículo se dirige con las llantas delanteras o traseras. 
+
+**4: Produce un gráfico de dispersión con `hwy` y `cyl`.**
+
+```{r hwy-cyl-scatterplot}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = cyl, y = hwy))
+```
+
+**5: ¿Qué pasa si haces un gráfico de dispersión con `class` y `drv`? ¿Por qué no es útil este gráfico?**
+
+```{r class-drv-scatterplot}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = class, y = drv))
+```
+
+Porque la distribución no nos dice nada sobre correlación. 
+
+
+## 3.3.1
+
+Preguntas 1 a 5. Agrega tus propios chunks aquí y responde a las preguntas.
+
+```{r Ejercicio 1: Qué error hay en el siguiente código? Por qué los puntos no son azules?}
+# ggplot(data=mpg) + geom_point(mapping = aes(x = displ, y = hwy, color = "blue"))
+
+# Versión correcta
+ggplot(data=mpg) +
+  geom_point(mapping = aes(x = displ, y = hwy), color = "blue")
+```
+No eran de color azul porque en el primer paréntesis, solo se indica lo visual. Los esquemas de color se tienen que indicar aparte. 
+
+```{r Ejercicio 2: Qué variables en mpg son categóricas? Cuáles continuas? Cómo se puede ver esto cuando corres mpg?}
+
+# ?mpg
+mpg 
+
+```
+Categóricas: trans, drv, fl y class
+Continuas: displ, year, cyl, cty, hwy, fl. 
+
+```{r Ejercicio 3: Mapea una variable continua a color, size y shape. Cómo se comportan estos aesthetics entre variables categóricas y continuas? }
+ggplot(data = mpg, aes(x = cyl, y = displ, size=cty)) + 
+  geom_point() + theme_classic(base_size = 10, base_family = "sans") # Size 
+
+ggplot(data = mpg, aes(x = cty, y = hwy, shape = fl)) + 
+  geom_point() + theme_classic(base_size = 10, base_family = "sans") # Shape 
+
+ggplot(data = mpg, aes(x = cty, y = hwy, stroke= 0.1)) + geom_point() + 
+  theme_classic(base_size = 10, base_family = "sans")
+
+ggplot(data = mpg, aes(x = cty, y = hwy, col = cyl < 5)) + geom_point() + 
+  theme_classic(base_size = 10, base_family = "sans") # Color
+```
+
+```{r Ejercicio 4: Qué sucede si a una variable le aplicas distintos aesthetics?}
+ggplot(data = mpg, aes(x = cyl, y = displ, size=cty, col=cty)) + 
+  geom_point() + theme_classic(base_size = 10, base_family = "sans") 
+```
+En realidad no tiene mucho sentido porque ambos aesthetics indican lo mismo. En algunos casos, podría hacer que lo representativo de algún aesthetic se perdiera. En el caso anterior, el color hace que se pierda un poco el tema de la diferencia en tamaño. En otros casos podría hacer resaltar más algunas características pero entonces sería recomendable apegarse a un solo aesthetic o tipo de gráfico que haga destacar bien los datos. 
+
+```{r Ejercicio 5: Qué hace el aesthetic stroke? Con qué formas funciona?}
+# ?geom_point
+# vignette("ggplot2-specs")
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
+```
+Stroke controla el tamaño de los bordes en las figuras. Funciona con todas las figuras que tengan algún tipo de borde. Estas figuras están numeradas del 0 al 25 y pueden verse en el comando vignette con las especificaciones de ggplot
+
+
+## 3.5.1
+
+Preguntas 1 a 4. Agrega tus propios chunks aquí y responde a las preguntas.
+
+```{r Ejercicio 1: Qué pasa si aplicas facet en una variable continua?}
+ggplot(data=mpg) +
+  geom_point(mapping = aes(x=cty, y = hwy)) + facet_grid(cty ~ hwy)
+```
+Dado que intenta emparejar cada valor, genera un gráfico con todos los valores que en este caso no es distinguible. 
+
+```{r Ejercicio 2: Qué representan las celdas vacías en facet_grid(drv ~ cy1)? Como se relacionan con el siguiente gráfico?}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = drv, y = cyl))
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = drv, y = cyl)) + facet_grid(drv ~ cyl)
+```
+Representan que no hay relación entre esos dos niveles de x y y. Basicamente los gráficos con ese comando hacen lo mismo, pero en el caso del facet_grid, separa en gráficos diferentes para cada conjunto de valores. Esto puede ser útil para destacar correlaciones, en qué valores no hay nada o si hay varios puntos en un cuadrante. 
+
+```{r Ejercicio 3: Qué gráficos genera el siguiente código? Qué hace .?}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy)) +
+  facet_grid(drv ~ .)
+
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy)) +
+  facet_grid(. ~ cyl)
+```
+
+Hace los mismo gráficos que el inciso anterior, pero el punto hace que en la variable x o y, se haga un mismo gráfico para todos los valores y no gráficos separados. 
+
+```{r Ejercicio 4: Cuáles son las ventajas de usar faceting en lugar de colour? Cuáles son las desventajas? Cómo cambiaría el balance con una base de datos más grande?}
+# ggplot(data = mpg) + geom_point(mapping = aes(x = displ, y = hwy)) + facet_wrap(~ class, nrow = 2)
+```
+Si tuvieramos una base de datos más grande, podríamos tener demasiados cuadrantes u observar una relación más clara. En ambos casos, perdemos detalles de lo específico en la visualización. 
+## 3.6.1
+
+Pregunta 1. Qué geom utilizarías para visualizar un gráfico de líneas? Boxplot? Histograma? Gráfico de área?
+
+Utilizaría geom_smooth para visualizar la línea y además cuento con la posibilidad de incluir el área de los errores estándar. 
+
+¡Listo! No olvides "tejer" el documento final, guardarlo como pdf y subirlo a Canvas. 
+
